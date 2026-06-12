@@ -45,6 +45,14 @@ Used EnvBuilder with the official `ghcr.io/coder/envbuilder:latest` image in a s
 
 **Status:** ⚠️ Partially works, but not suitable
 
+**Observed Behavior:**
+- ✅ Successfully clones the repository
+- ✅ Successfully builds the devcontainer image using Kaniko
+- ✅ Successfully pushes the image to the registry (`quay.io/rokumar/workspaces-envbuilder@sha256:...`)
+- ❌ Pod does **not** exit after push completion
+- ❌ Continues to runtime phase with: `=== Running init command as user "coder": ["/bin/sh" "-c" "sleep infinity"]`
+- ❌ Job pod remains in `Running` state indefinitely
+
 **Issues:**
 1. EnvBuilder's `ENVBUILDER_PUSH_IMAGE` option pushes the image but does **not** terminate execution. The container continues into runtime phase by executing the configured init command (`sleep infinity`). There is no "build-and-exit" mode in the standard image.
 2. Requires a container registry for storing built images with associated complexity:
