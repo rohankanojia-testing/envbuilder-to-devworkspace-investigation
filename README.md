@@ -15,7 +15,7 @@ EnvBuilder is a [Coder](https://coder.com) tool that builds and runs development
 
 ## Investigation Approaches
 
-This investigation explored three different approaches to integrating EnvBuilder with DevWorkspace:
+This investigation explored four different approaches to integrating EnvBuilder with DevWorkspace:
 
 ### 1. EnvBuilder Inside K8s Pod
 See: [`envbuilder-inside-k8s-pod/`](./envbuilder-inside-k8s-pod/)
@@ -38,15 +38,15 @@ error: temp remount: temp remount: ensure path: mkdir /.envbuilder/mnt: permissi
 
 **Root cause:** DevWorkspace's restricted security context (non-root user, `allowPrivilegeEscalation: false`, dropped capabilities) conflicts with EnvBuilder's need to perform filesystem mutations and remounts.
 
-### 3. EnvBuilder as Separate Build Job
-See: [`envbuilder-separate-job-build-devworkspace-image/`](./envbuilder-separate-job-build-devworkspace-image/)
+### 3. EnvBuilder as Separate Build Job (Standard Image)
+See: [`envbuilder-separate-job-standard-image/`](./envbuilder-separate-job-standard-image/)
 
-Used EnvBuilder in a separate Kubernetes Job to build and push an image to a registry, which could then be consumed by a DevWorkspace.
+Used EnvBuilder with the official `ghcr.io/coder/envbuilder:latest` image in a separate Kubernetes Job to build and push an image to a registry, which could then be consumed by a DevWorkspace.
 
 **Status:** ⚠️ Partially works, but not suitable
 
 **Issues:**
-1. EnvBuilder's `ENVBUILDER_PUSH_IMAGE` option pushes the image but does not terminate execution. Instead, the container continues into runtime phase by executing the configured init command. There is no "build-and-exit" mode.
+1. EnvBuilder's `ENVBUILDER_PUSH_IMAGE` option pushes the image but does **not** terminate execution. The container continues into runtime phase by executing the configured init command (`sleep infinity`). There is no "build-and-exit" mode in the standard image.
 2. Requires a container registry for storing built images with associated complexity:
    - **OpenShift Internal Registry:** Requires proper RBAC permissions, service account configuration, and image pull secrets for DevWorkspaces to access images
    - **External Registry (Docker Hub, Quay.io, etc.):** Requires:
@@ -55,6 +55,17 @@ Used EnvBuilder in a separate Kubernetes Job to build and push an image to a reg
      - Proper authentication configuration (`ENVBUILDER_DOCKER_CONFIG_BASE64`)
      - Network egress policies to allow image push/pull operations
    - Either approach adds operational overhead and security considerations for credential management
+
+### 4. EnvBuilder as Separate Build Job (Custom Image)
+See: [`envbuilder-separate-job-build-devworkspace-image/`](./envbuilder-separate-job-build-devworkspace-image/)
+
+Same approach as #3 but using a custom EnvBuilder fork (`quay.io/rokumar/envbuilder:latest`) with patches attempting to add "build-and-exit" functionality.
+
+**Status:** ⚠️ Partially works, but not suitable
+
+**Issues:**
+1. Even with custom patches (`ENVBUILDER_BUILD_ONLY`, `ENVBUILDER_EXIT_ON_PUSH_FAILURE`, `ENVBUILDER_OPENSHIFT_COMPAT`), requires upstream support for true build-only mode
+2. Same registry complexity issues as approach #3
 
 ## Findings
 
@@ -139,9 +150,10 @@ Modify EnvBuilder to decouple image building from runtime filesystem mutation
 
 ```
 .
-├── envbuilder-inside-k8s-pod/              # Standard K8s Pod example
-├── envbuilder-inside-devworkspace/         # Failed DevWorkspace attempt
-├── envbuilder-separate-job-build-devworkspace-image/  # Build Job approach
+├── envbuilder-inside-k8s-pod/                          # Standard K8s Pod example
+├── envbuilder-inside-devworkspace/                     # Failed DevWorkspace attempt
+├── envbuilder-separate-job-standard-image/             # Build Job with standard image
+├── envbuilder-separate-job-build-devworkspace-image/   # Build Job with custom image
 └── README.md
 ```
 
