@@ -1,0 +1,29 @@
+apiVersion: workspace.devfile.io/v1alpha2
+kind: DevWorkspace
+metadata:
+  name: envbuilder-gh-repo
+  annotations:
+    controller.devfile.io/debug-start: "true"
+spec:
+  started: true
+  template:
+    components:
+      - name: envbuilder
+        container:
+          image: ghcr.io/coder/envbuilder:latest
+          env:
+            - name: ENVBUILDER_GIT_URL
+              value: "https://github.com/coder/envbuilder-starter-devcontainer"
+            - name: ENVBUILDER_WORKSPACE_FOLDER
+              value: "/projects"
+            - name: ENVBUILDER_INIT_SCRIPT
+              value: "sleep infinity"
+            - name: ENVBUILDER_LAYER_CACHE_DIR
+              value: "/cache"
+            - name: ENVBUILDER_BASE_IMAGE_CACHE_DIR
+              value: "/tmp/envbuilder-cache"
+            - name: ENVBUILDER_VERBOSE
+              value: "true"
+          memoryLimit: 4Gi
+          cpuLimit: 2000m
+

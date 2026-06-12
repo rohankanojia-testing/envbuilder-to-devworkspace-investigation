@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: envbuilder-build-example
+  labels:
+    app: envbuilder-build
+spec:
+  containers:
+  - name: envbuilder
+    image: ghcr.io/coder/envbuilder:latest
+    env:
+    # Git repository containing devcontainer.json with "build" configuration
+    # This repo contains:
+    #   - .devcontainer/devcontainer.json (with "build" property)
+    #   - .devcontainer/Dockerfile
+    - name: ENVBUILDER_GIT_URL
+      value: "https://github.com/coder/envbuilder-starter-devcontainer"
+
+    # Path to devcontainer.json if not in default location
+    - name: ENVBUILDER_DEVCONTAINER_DIR
+      value: ".devcontainer"
+
+    # Keep the container running after build
+    - name: ENVBUILDER_INIT_SCRIPT
+      value: "sleep infinity"
+
+    # Workspace folder
+    - name: ENVBUILDER_WORKSPACE_FOLDER
+      value: "/workspace"
+
+    # Enable verbose logging to see the build process
+    - name: ENVBUILDER_VERBOSE
+      value: "true"
+
+    # Layer cache directory (important for build performance)
+    - name: ENVBUILDER_LAYER_CACHE_DIR
+      value: "/cache"
+    volumeMounts:
+    - name: workspace
+      mountPath: /workspace
+    - name: cache
+      mountPath: /cache
+    resources:
+      requests:
+        memory: "2Gi"    # More memory for builds
+        cpu: "1000m"
+      limits:
+        memory: "4Gi"    # Builds can be memory-intensive
+        cpu: "2000m"
+  volumes:
+  - name: workspace
+    emptyDir: {}
+  - name: cache
+    emptyDir: {}
+  restartPolicy: Never
+
