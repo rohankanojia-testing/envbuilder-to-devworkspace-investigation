@@ -2,6 +2,23 @@
 
 This repository contains a proof-of-concept investigation for [Eclipse Che #23458](https://github.com/eclipse/che/issues/23458) exploring whether [EnvBuilder](https://github.com/coder/envbuilder) can be used to provide native `devcontainer.json` support in Eclipse Che DevWorkspaces.
 
+## Table of Contents
+
+- [What is EnvBuilder?](#what-is-envbuilder)
+- [Investigation Approaches](#investigation-approaches)
+  - [1. EnvBuilder Inside K8s Pod](#1-envbuilder-inside-k8s-pod)
+  - [2. EnvBuilder Inside DevWorkspace](#2-envbuilder-inside-devworkspace)
+  - [3. EnvBuilder as Separate Build Job (Standard Image)](#3-envbuilder-as-separate-build-job-standard-image)
+  - [4. EnvBuilder as Separate Build Job (Custom Image)](#4-envbuilder-as-separate-build-job-custom-image)
+- [Findings](#findings)
+  - [Architectural Mismatch](#architectural-mismatch)
+  - [Compatibility Analysis](#compatibility-analysis)
+  - [Possible Integration Paths](#possible-integration-paths)
+- [Repository Structure](#repository-structure)
+- [Conclusion](#conclusion)
+- [Related Issues](#related-issues)
+- [References](#references)
+
 ## What is EnvBuilder?
 
 EnvBuilder is a [Coder](https://coder.com) tool that builds and runs development environments from a Git repository's `devcontainer.json` or `Dockerfile` on Docker, Kubernetes, and OpenShift.
@@ -69,11 +86,23 @@ See: [`envbuilder-separate-job-build-devworkspace-image/`](./envbuilder-separate
 
 Same approach as #3 but using a custom EnvBuilder fork (`quay.io/rokumar/envbuilder:latest`) with patches attempting to add "build-and-exit" functionality.
 
-**Status:** ⚠️ Partially works, but not suitable
+**Status:** ✅ Works - Successfully exits after build and push
 
-**Issues:**
-1. Even with custom patches (`ENVBUILDER_BUILD_ONLY`, `ENVBUILDER_EXIT_ON_PUSH_FAILURE`, `ENVBUILDER_OPENSHIFT_COMPAT`), requires upstream support for true build-only mode
-2. Same registry complexity issues as approach #3
+**Observed Behavior:**
+- ✅ Successfully clones the repository
+- ✅ Successfully builds the devcontainer image using Kaniko
+- ✅ Successfully pushes the image to the registry (`quay.io/rokumar/workspaces-envbuilder@sha256:...`)
+- ✅ **Pod exits cleanly** with Status: `Completed`, State: `Terminated`, Reason: `Completed`
+- ✅ Job completes successfully and can be used in CI/CD pipelines
+
+**Key Difference from Approach #3:**
+The custom image with patches (`ENVBUILDER_BUILD_ONLY`, `ENVBUILDER_EXIT_ON_PUSH_FAILURE`, `ENVBUILDER_OPENSHIFT_COMPAT`) successfully implements "build-and-exit" behavior. Unlike the standard image (approach #3) which remains running with `sleep infinity`, this custom image terminates after completing the build and push operations.
+
+**Remaining Considerations:**
+1. Requires maintaining a custom EnvBuilder fork with patches
+2. Same registry complexity issues as approach #3:
+   - **OpenShift Internal Registry:** Requires proper RBAC permissions, service account configuration, and image pull secrets for DevWorkspaces to access images
+   - **External Registry (Docker Hub, Quay.io, etc.):** Requires registry credentials management, secure credential injection, and network policies
 
 ## Findings
 
@@ -119,9 +148,10 @@ Same approach as #3 but using a custom EnvBuilder fork (`quay.io/rokumar/envbuil
 2. Build and push the resulting OCI image to a registry
 3. Start DevWorkspace from the prebuilt, immutable image
 
-**Blockers:**
-- EnvBuilder currently lacks a "build-and-exit" mode
-- Requires upstream changes to support: `build → push → exit` workflow
+**Status Update:**
+- ✅ **Proven to work** with custom EnvBuilder fork (approach #4)
+- ❌ Standard EnvBuilder image lacks "build-and-exit" mode (approach #3)
+- ⚠️ Requires maintaining custom patches until upstream support is added
 
 **Additional Considerations:**
 - **Registry Selection:**
